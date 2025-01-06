@@ -12,6 +12,8 @@ import ReactMarkdown from "react-markdown";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import BotDP from "../../public/bot-image.png";
 import TypingIndicator from "@/components/ui/typingIndicator";
+import { HeroHighlight, Highlight } from "@/components/ui/hero-highlight";
+import { motion } from "framer-motion";
 
 interface Suggestion {
   id: number;
@@ -42,8 +44,7 @@ const suggestions: Suggestion[] = [
   {
     id: 3,
     title: "Explain what is Tokenomics in Web3?",
-    description:
-      "Understand the what are Tokens and its economics deeply.",
+    description: "Understand the what are Tokens and its economics deeply.",
     icon: "🔐",
   },
   {
@@ -117,7 +118,7 @@ export default function Chatbot() {
   };
 
   const handleSuggestionClick = (suggestion: string): void => {
-    if(initializingBot) return;
+    if (initializingBot) return;
     setInput(suggestion);
     handleFormSubmit();
   };
@@ -156,9 +157,29 @@ export default function Chatbot() {
       <div className="flex-1 overflow-y-auto no-scrollbar">
         <div className="mx-auto w-full max-w-3xl">
           {showInitialUI && (
-            <h1 className="text-4xl font-semibold text-center mt-20 mb-8 bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-purple-600">
-              How can I assist you?
-            </h1>
+            <HeroHighlight>
+              <motion.h1
+                initial={{
+                  opacity: 0,
+                  y: 20,
+                }}
+                animate={{
+                  opacity: 1,
+                  y: [20, -5, 0],
+                }}
+                transition={{
+                  duration: 0.5,
+                  ease: [0.4, 0.0, 0.2, 1],
+                }}
+                className="text-2xl px-4 md:text-4xl pt-20  lg:text-5xl font-bold text-neutral-700 dark:text-white max-w-4xl leading-relaxed lg:leading-snug text-center"
+              >
+                Hey I&apos;m Vedika.😀
+                <br />
+                <Highlight className="text-black dark:text-white">
+                  How can i help you ?
+                </Highlight>
+              </motion.h1>
+            </HeroHighlight>
           )}
 
           {showInitialUI && (
@@ -217,9 +238,9 @@ export default function Chatbot() {
             ))}
             {loading && (
               <div className="flex items-start ">
-                <Avatar className="w-8 h-8 " >
+                <Avatar className="w-8 h-8 ">
                   <AvatarImage src={BotDP.src} alt="Bot" />
-                </Avatar> 
+                </Avatar>
                 <TypingIndicator />
               </div>
             )}
@@ -232,7 +253,7 @@ export default function Chatbot() {
         className={cn(
           "w-full max-w-3xl mx-auto transition-all duration-500",
           centerInput
-            ? "absolute inset-x-0 bottom-[50%] translate-y-[50%]"
+            ? "absolute inset-x-0 bottom-[55%] translate-y-[50%]"
             : "sticky bottom-0"
         )}
       >
@@ -274,6 +295,7 @@ export default function Chatbot() {
           </form>
         </div>
       </div>
+
       <footer className="w-full bg-white/50 dark:bg-zinc-800/50 backdrop-blur-sm py-4 text-center text-sm text-zinc-600 dark:text-zinc-400 border-t border-zinc-200 dark:border-zinc-700">
         <p>
           ⚠️ This AI agent is not a lawyer and its responses do not constitute
