@@ -1,49 +1,36 @@
-import { NextResponse } from "next/server";
-import fs from "fs";
-import fetch from "node-fetch";
+import path from "path";
 import {
   FileState,
   GoogleAIFileManager,
   GoogleAICacheManager,
 } from "@google/generative-ai/server";
 
-// API Key from Environment Variables
-const API_KEY = process.env.GEMINI_API_KEY || "";
-const pdfUrl = process.env.PDF_URL || "";
+const API_KEY = process.env.NEXT_PUBLIC_GEMINI_API_KEY || "";
+const txtPath = path.join(process.cwd(), "public/file.txt");
 
-// Download, Upload and Cache PDF
-async function uploadAndCachePDF(pdfUrl: string, displayName: string) {
-  const pdfPath = `./public/${displayName}.pdf`;
+export async function GET() {
+  const displayName = "UK Crypto Law Guide";
   const fileManager = new GoogleAIFileManager(API_KEY);
   const cacheManager = new GoogleAICacheManager(API_KEY);
 
   try {
-    // Download the PDF from URL
-    const pdfBuffer = await fetch(pdfUrl).then((response) =>
-      response.arrayBuffer()
-    );
-    const binaryPdf = Buffer.from(pdfBuffer);
-    console.log("PDF downloaded:", binaryPdf.length, "bytes");
-    fs.writeFileSync(pdfPath, binaryPdf, "binary");
-    console.log(`PDF saved at: ${pdfPath}`);
-
-    // Upload the PDF to Gemini
-    const fileResult = await fileManager.uploadFile(pdfPath, {
+    // Upload to Gemini
+    const fileResult = await fileManager.uploadFile(txtPath, {
       displayName,
-      mimeType: "application/pdf",
+      mimeType: "text/plain",
     });
 
     const { name } = fileResult.file;
 
-    // Wait for PDF processing
+    // Wait for processing to complete
     let file = await fileManager.getFile(name);
     while (file.state === FileState.PROCESSING) {
-      console.log("Processing PDF...");
+      console.log("Processing TXT...");
       await new Promise((resolve) => setTimeout(resolve, 2000));
       file = await fileManager.getFile(name);
     }
 
-    console.log(`PDF processing complete: ${file.uri} ${file.mimeType}`);
+    console.log(`TXT processing complete: ${file.uri} ${file.mimeType}`);
 
     const systemInstruction = `
   You are an expert in UK Crypto Law. Your task is to assist users by providing context-based answers directly from the cached PDF guide. 
@@ -69,9 +56,11 @@ async function uploadAndCachePDF(pdfUrl: string, displayName: string) {
 
   Instruction:
   - If the question cannot be answered directly from the PDF, politely inform the user and recommend reading the guide or contacting a legal expert.
+  - Don't answer anyting that is not directly from the PDF, even if you know the answer. If the answer is not in the PDF, reject politely.
+  - Anything outside the context of crypto and web3 should be rejected. Decline with a polite message.
 `;
 
-    // Cache the PDF in Gemini
+    // Cache the uploaded TXT in Gemini
     const cachedResult = await cacheManager.create({
       model: "models/gemini-1.5-flash-001",
       displayName,
@@ -92,24 +81,14 @@ async function uploadAndCachePDF(pdfUrl: string, displayName: string) {
       ttlSeconds: 600,
     });
 
-    console.log("Cache initialized with PDF:", cachedResult);
-    return {
-      success: true,
-      cacheId: cachedResult,
-      fileUri: file.uri,
-    };
+    return new Response(JSON.stringify({ success: true, cachedResult }), {
+      status: 200,
+    });
   } catch (error) {
-    console.error("Error during PDF upload:", error);
-    return {
-      success: false,
-      error: error,
-    };
+    console.error("Error during TXT upload:", error);
+    return new Response(
+      JSON.stringify({ success: false, error: "Upload failed" }),
+      { status: 500 }
+    );
   }
-}
-
-// Automatically cache PDF when page loads
-export async function GET() {
-  const displayName = "The Founder's Guide to UK";
-  const result = await uploadAndCachePDF(pdfUrl, displayName);
-  return NextResponse.json(result);
 }

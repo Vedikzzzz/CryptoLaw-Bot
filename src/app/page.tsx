@@ -1,11 +1,14 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useState, useRef, useEffect } from "react";
 import { Textarea } from "@/components/ui/textarea";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { Button } from "@/components/ui/button";
 import { SendHorizontal } from "lucide-react";
 import cn from "clsx";
 import { ModeToggle } from "@/components/ui/modeToggle";
+import ReactMarkdown from "react-markdown";
 
 const suggestions = [
   {
@@ -33,28 +36,72 @@ const suggestions = [
 ];
 
 const MAX_CHARS = 2000;
+const API_KEY = process.env.NEXT_PUBLIC_GEMINI_API_KEY || "";
 
 export default function Chatbot() {
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<
     { id: string; content: string; role: "user" | "bot" }[]
   >([]);
+  const [genModel, setGenModel] = useState<any | null>(null);
   const [showInitialUI, setShowInitialUI] = useState(true);
   const [centerInput, setCenterInput] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [initializingBot, setInitializingBot] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Simulate Bot Response
-  const simulateBotResponse = () => {
-    setTimeout(() => {
+  useEffect(() => {
+    const initializeModel = async () => {
+      try {
+        const response = await fetch("/api/upload");
+        const data = await response.json();
+        if (data.success) {
+          const genAI = new GoogleGenerativeAI(API_KEY);
+          const model = genAI.getGenerativeModelFromCachedContent(
+            data.cachedResult
+          );
+          console.log("Model initialized successfully");
+          setGenModel(model);
+          setInitializingBot(false);
+        } else {
+          console.error("Failed to initialize model");
+        }
+      } catch (error) {
+        console.error("Failed to initialize model:", error);
+      }
+    };
+    initializeModel();
+  }, []);
+
+  const handleBotResponse = async (userInput: string) => {
+    if (!genModel) return;
+    console.log("Generating bot response...");
+    setLoading(true);
+
+    try {
+      const result = await genModel.generateContent({
+        contents: [
+          {
+            role: "user",
+            parts: [{ text: userInput }],
+          },
+        ],
+      });
+
       const botMessage: { id: string; content: string; role: "user" | "bot" } =
         {
           id: Date.now().toString(),
-          content: "This is a simulated response from the bot.",
+          content: result.response.text() || "No relevant answer found.",
           role: "bot",
         };
+
       setMessages((prev) => [...prev, botMessage]);
       scrollToBottom();
-    }, 1000);
+    } catch (error) {
+      console.error("Error generating bot response:", error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Handle Suggestion Click
@@ -76,8 +123,8 @@ export default function Chatbot() {
     setMessages((prev) => [...prev, newMessage]);
     setInput("");
     setShowInitialUI(false);
-    setCenterInput(false); // Move input box to bottom
-    simulateBotResponse();
+    setCenterInput(false);
+    handleBotResponse(input);
     scrollToBottom();
   };
 
@@ -123,20 +170,23 @@ export default function Chatbot() {
           )}
 
           {/* Messages */}
-          <div className="space-y-4 px-4 pb-2 pt-4">
+          <div className="space-y-4 px-4 pb-32 pt-4">
             {messages.map((message) => (
               <div
                 key={message.id}
                 className={cn(
                   "rounded-lg px-4 py-2 max-w-[75%]",
                   message.role === "user"
-                    ? "ml-auto dark:bg-[#171717] bg-[#f3f3f3] "
-                    : ""
+                    ? "ml-auto dark:bg-[#171717] bg-[#f3f3f3]"
+                    : "bg-muted"
                 )}
               >
-                {message.content}
+                <ReactMarkdown>{message.content}</ReactMarkdown>
               </div>
             ))}
+            {loading && (
+              <div className="px-4 py-2 rounded-lg bg-muted">Typing...</div>
+            )}
             <div ref={messagesEndRef} />
           </div>
         </div>
@@ -163,7 +213,12 @@ export default function Chatbot() {
                     handleFormSubmit();
                   }
                 }}
-                placeholder="Start a new conversation..."
+                disabled={initializingBot}
+                placeholder={
+                  initializingBot
+                    ? "Initializing The Bot. Please wait ><"
+                    : "Start a new conversation..."
+                }
                 className="w-full min-h-[60px] resize-none border-0 bg-transparent p-4 text-foreground focus:ring-0"
                 maxLength={MAX_CHARS}
               />
@@ -191,10 +246,7 @@ export default function Chatbot() {
         </p>
         <p className="mt-2">
           Need expert consultation?{" "}
-          <a className="underline">
-            Contact our legal team
-          </a>
-          .
+          <a className="underline">Contact our legal team</a>.
         </p>
       </footer>
     </div>
